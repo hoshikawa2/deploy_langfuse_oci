@@ -1385,7 +1385,10 @@ E depois acessar via browser com:
 
 ![img_2.png](images/img_2.png)
 
+---
 
+>**IMPORTANT**: The source code must be used at your own risk. There is no support and/or link with any company. The source code is free to modify and was built solely for the purpose of helping the community
+> 
 ---
 
 # ✅ Resultado Final
@@ -1399,3 +1402,10 @@ Ao final:
 * Langfuse operacional no OKE
 * arquitetura segura e escalável
 
+# Referências
+
+- [Langfuse - OCI Object Storage (Native)](https://langfuse.com/self-hosting/deployment/infrastructure/blobstorage#oci-object-storage)
+
+# Acknowledgments
+
+- **Author** - Cristiano Hoshikawa (Oracle LAD A-Team Solution Engineer)
