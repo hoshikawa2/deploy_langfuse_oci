@@ -1,0 +1,591 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: oci-bv-high-performance
+provisioner: blockvolume.csi.oraclecloud.com
+parameters:
+  vpusPerGB: "20"
+  attachment-type: "paravirtualized"
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: langfuse-db-pvc
+  namespace: langfuse
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: oci-bv-high-performance
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-db
+  namespace: langfuse
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: langfuse-db
+  template:
+    metadata:
+      labels:
+        app: langfuse-db
+    spec:
+      imagePullSecrets:
+        - name: ocirsecret
+      containers:
+        - name: langfuse-db
+          image: iad.ocir.io/xxxxxxxxxx/postgres:15
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: "langfuse"
+            - name: POSTGRES_PASSWORD
+              value: "langfuse123"
+            - name: POSTGRES_DB
+              value: "langfuse"
+            - name: PGDATA
+              value: "/var/lib/postgresql/data/pgdata"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "2Gi"
+            limits:
+              cpu: "512m"
+              memory: "3Gi"
+          volumeMounts:
+            - name: db-data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: db-data
+          persistentVolumeClaim:
+            claimName: langfuse-db-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-db
+  namespace: langfuse
+spec:
+  type: NodePort
+  selector:
+    app: langfuse-db
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-redis
+  namespace: langfuse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langfuse-redis
+  template:
+    metadata:
+      labels:
+        app: langfuse-redis
+    spec:
+      imagePullSecrets:
+        - name: ocirsecret
+      containers:
+        - name: redis
+          image: iad.ocir.io/xxxxxxxxxxx/redis:7.2
+          command: ["redis-server", "--requirepass", "redis123"]
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "2Gi"
+            limits:
+              cpu: "512m"
+              memory: "3Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-redis
+  namespace: langfuse
+spec:
+  type: NodePort
+  selector:
+    app: langfuse-redis
+  ports:
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: langfuse-clickhouse
+  namespace: langfuse
+spec:
+  serviceName: langfuse-clickhouse
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langfuse-clickhouse
+  template:
+    metadata:
+      labels:
+        app: langfuse-clickhouse
+    spec:
+      imagePullSecrets:
+        - name: ocirsecret
+      containers:
+        - name: clickhouse
+          image: iad.ocir.io/xxxxxxxxxxxx/clickhouse:23.8
+          ports:
+            - containerPort: 8123
+            - containerPort: 9000
+          resources:
+            requests:
+              cpu: "2"
+              memory: "8Gi"
+            limits:
+              cpu: "4"
+              memory: "16Gi"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/clickhouse
+          env:
+            - name: CLICKHOUSE_DB
+              value: "default"
+
+            - name: CLICKHOUSE_USER
+              value: "default"
+
+            - name: CLICKHOUSE_PASSWORD
+              value: "clickhouse123"
+
+            - name: CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT
+              value: "1"
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: oci-bv-high-performance
+        resources:
+          requests:
+            storage: 200Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-clickhouse
+  namespace: langfuse
+spec:
+  selector:
+    app: langfuse-clickhouse
+  ports:
+    - name: http
+      port: 8123
+    - name: native
+      port: 9000
+---
+# ===== LANGFUSE APPLICATION =====
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse
+  namespace: langfuse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langfuse
+  template:
+    metadata:
+      labels:
+        app: langfuse
+    spec:
+      imagePullSecrets:
+        - name: ocirsecret
+
+      initContainers:
+
+        - name: wait-for-postgres
+          image: busybox
+
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z langfuse-db 5432; do
+                echo "⏳ Waiting for PostgreSQL..."
+                sleep 2
+              done
+
+        - name: wait-for-redis
+          image: busybox
+
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z langfuse-redis 6379; do
+                echo "⏳ Waiting for Redis..."
+                sleep 2
+              done
+
+        - name: wait-for-clickhouse
+          image: busybox
+
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z langfuse-clickhouse 9000; do
+                echo "⏳ Waiting for ClickHouse..."
+                sleep 2
+              done
+      containers:
+        - name: langfuse
+          image: iad.ocir.io/xxxxxxxxxxxx/langfuse:3.1.0
+          ports:
+            - containerPort: 3000
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://langfuse:langfuse123@langfuse-db:5432/langfuse"
+            - name: NEXTAUTH_SECRET
+              value: "nextauth-secret-123"
+            - name: SALT
+              value: "salt-secret-123"
+            - name: ENCRYPTION_KEY
+              value: "ea58fe36914e38ec5d52657c928d3e8350ff1513e1930e0fd306dce6422bf87d"
+            - name: NEXTAUTH_URL
+              value: https://langfuse.seudominio.com
+            - name: TELEMETRY_ENABLED
+              value: "false"
+            - name: CLICKHOUSE_URL
+              value: "http://langfuse-clickhouse:8123"
+            - name: CLICKHOUSE_USER
+              value: "default"
+            - name: CLICKHOUSE_PASSWORD
+              value: "clickhouse123"
+            - name: CLICKHOUSE_CLUSTER_ENABLED
+              value: "false"
+            - name: CLICKHOUSE_MIGRATION_URL
+              value: "clickhouse://langfuse-clickhouse:9000"
+            - name: REDIS_HOST
+              value: "langfuse-redis"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_AUTH
+              value: "redis123"
+            # ===== OCI OBJECT STORAGE (EVENTS) =====
+            - name: LANGFUSE_USE_OCI_NATIVE_OBJECT_STORAGE
+              value: "true"
+            - name: LANGFUSE_OCI_AUTH_TYPE
+              value: "instance_principal"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
+              value: "langfuse-events"
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_REGION
+              value: "us-ashburn-1"
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
+              value: "https://xxxxxxxxxxx.compat.objectstorage.us-ashburn-1.oraclecloud.com"
+
+#            - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+#              valueFrom:
+#                secretKeyRef:
+#                  name: langfuse-secret
+#                  key: oci-access-key
+#
+#            - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+#              valueFrom:
+#                secretKeyRef:
+#                  name: langfuse-secret
+#                  key: oci-secret-key
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
+              value: "true"
+
+            # ===== EXPORT =====
+            - name: LANGFUSE_S3_BATCH_EXPORT_ENABLED
+              value: "true"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_BUCKET
+              value: "langfuse-exports"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_REGION
+              value: "us-ashburn-1"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_ENDPOINT
+              value: "https://xxxxxxxxxxxx.compat.objectstorage.us-ashburn-1.oraclecloud.com"
+
+#            - name: LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID
+#              valueFrom:
+#                secretKeyRef:
+#                  name: langfuse-secret
+#                  key: oci-access-key
+#
+#            - name: LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY
+#              valueFrom:
+#                secretKeyRef:
+#                  name: langfuse-secret
+#                  key: oci-secret-key
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE
+              value: "true"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "2Gi"
+            limits:
+              cpu: "512m"
+              memory: "3Gi"
+          livenessProbe:
+            httpGet:
+              path: /api/public/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /api/public/health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+
+---
+# ===== LANGFUSE WORKER =====
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-worker
+  namespace: langfuse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langfuse-worker
+  template:
+    metadata:
+      labels:
+        app: langfuse-worker
+    spec:
+      imagePullSecrets:
+        - name: ocirsecret
+
+      initContainers:
+
+        - name: wait-for-postgres
+          image: busybox
+
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z langfuse-db 5432; do
+                echo "⏳ Waiting for PostgreSQL..."
+                sleep 2
+              done
+
+        - name: wait-for-redis
+          image: busybox
+
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z langfuse-redis 6379; do
+                echo "⏳ Waiting for Redis..."
+                sleep 2
+              done
+
+        - name: wait-for-clickhouse
+          image: busybox
+
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z langfuse-clickhouse 9000; do
+                echo "⏳ Waiting for ClickHouse..."
+                sleep 2
+              done
+      containers:
+        - name: worker
+          image: iad.ocir.io/xxxxxxxxxxxx/langfuse-worker:3.1.0
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://langfuse:langfuse123@langfuse-db:5432/langfuse"
+            - name: ENCRYPTION_KEY
+              value: "ea58fe36914e38ec5d52657c928d3e8350ff1513e1930e0fd306dce6422bf87d"
+            - name: CLICKHOUSE_URL
+              value: "http://langfuse-clickhouse:8123"
+            - name: CLICKHOUSE_USER
+              value: "default"
+            - name: CLICKHOUSE_PASSWORD
+              value: "clickhouse123"
+            - name: CLICKHOUSE_CLUSTER_ENABLED
+              value: "false"
+            - name: CLICKHOUSE_MIGRATION_URL
+              value: "clickhouse://langfuse-clickhouse:9000"
+            - name: REDIS_HOST
+              value: "langfuse-redis"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_AUTH
+              value: "redis123"
+            # ===== OCI OBJECT STORAGE (EVENTS) =====
+            - name: LANGFUSE_USE_OCI_NATIVE_OBJECT_STORAGE
+              value: "true"
+            - name: LANGFUSE_OCI_AUTH_TYPE
+              value: "instance_principal"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
+              value: "langfuse-events"
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_REGION
+              value: "us-ashburn-1"
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
+              value: "https://xxxxxxxxx.compat.objectstorage.us-ashburn-1.oraclecloud.com"
+
+#            - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+#              valueFrom:
+#                secretKeyRef:
+#                  name: langfuse-secret
+#                  key: oci-access-key
+#
+#            - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+#              valueFrom:
+#                secretKeyRef:
+#                  name: langfuse-secret
+#                  key: oci-secret-key
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
+              value: "true"
+
+            # ===== EXPORT =====
+            - name: LANGFUSE_S3_BATCH_EXPORT_ENABLED
+              value: "true"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_BUCKET
+              value: "langfuse-exports"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_REGION
+              value: "us-ashburn-1"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_ENDPOINT
+              value: "https://xxxxxxxxxxx.compat.objectstorage.us-ashburn-1.oraclecloud.com"
+
+#            - name: LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID
+#              valueFrom:
+#                secretKeyRef:
+#                  name: langfuse-secret
+#                  key: oci-access-key
+#
+#            - name: LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY
+#              valueFrom:
+#                secretKeyRef:
+#                  name: langfuse-secret
+#                  key: oci-secret-key
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE
+              value: "true"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "2Gi"
+            limits:
+              cpu: "512m"
+              memory: "3Gi"
+---
+# ===== LANGFUSE SERVICE =====
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-web
+  namespace: langfuse
+  annotations:
+    service.beta.kubernetes.io/oci-load-balancer-internal: "true"
+    oci.oraclecloud.com/healthcheck-path: "/api/public/health"
+    oci.oraclecloud.com/healthcheck-port: "3000"
+spec:
+  type: LoadBalancer
+  selector:
+    app: langfuse
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+---
+# ===== LANGFUSE HPA - HORIZONTAL POD AUTOSCALER =====
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: langfuse-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: langfuse
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+# ===== WORKER - AUTOSCALER =====
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: langfuse-worker-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: langfuse-worker
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-lb
+  namespace: langfuse
+  annotations:
+    service.beta.kubernetes.io/oci-load-balancer-shape: "flexible"
+    oci.oraclecloud.com/healthcheck-path: "/api/public/health"
+spec:
+  type: LoadBalancer
+  selector:
+    app: langfuse
+  ports:
+    - port: 80
+      targetPort: 3000

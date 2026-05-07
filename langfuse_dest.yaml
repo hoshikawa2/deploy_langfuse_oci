@@ -1,0 +1,591 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: oci-bv-high-performance
+provisioner: blockvolume.csi.oraclecloud.com
+parameters:
+  vpusPerGB: "20"
+  attachment-type: "paravirtualized"
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ${APP_NAME}-db-pvc
+  namespace: ${K8S_NAMESPACE}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: oci-bv-high-performance
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${APP_NAME}-db
+  namespace: ${K8S_NAMESPACE}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ${APP_NAME}-db
+  template:
+    metadata:
+      labels:
+        app: ${APP_NAME}-db
+    spec:
+      imagePullSecrets:
+        - name: ocirsecret
+      containers:
+        - name: ${APP_NAME}-db
+          image: ${IMAGE_REPOSITORY}/postgres:${POSTGRES_TAG}
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: "langfuse"
+            - name: POSTGRES_PASSWORD
+              value: "${DB_PASSWORD}"
+            - name: POSTGRES_DB
+              value: "langfuse"
+            - name: PGDATA
+              value: "/var/lib/postgresql/data/pgdata"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "2Gi"
+            limits:
+              cpu: "512m"
+              memory: "3Gi"
+          volumeMounts:
+            - name: db-data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: db-data
+          persistentVolumeClaim:
+            claimName: ${APP_NAME}-db-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${APP_NAME}-db
+  namespace: ${K8S_NAMESPACE}
+spec:
+  type: NodePort
+  selector:
+    app: ${APP_NAME}-db
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${APP_NAME}-redis
+  namespace: ${K8S_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${APP_NAME}-redis
+  template:
+    metadata:
+      labels:
+        app: ${APP_NAME}-redis
+    spec:
+      imagePullSecrets:
+        - name: ocirsecret
+      containers:
+        - name: redis
+          image: ${IMAGE_REPOSITORY}/redis:${REDIS_TAG}
+          command: ["redis-server", "--requirepass", "${REDIS_AUTH}"]
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "2Gi"
+            limits:
+              cpu: "512m"
+              memory: "3Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${APP_NAME}-redis
+  namespace: ${K8S_NAMESPACE}
+spec:
+  type: NodePort
+  selector:
+    app: ${APP_NAME}-redis
+  ports:
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ${APP_NAME}-clickhouse
+  namespace: ${K8S_NAMESPACE}
+spec:
+  serviceName: ${APP_NAME}-clickhouse
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${APP_NAME}-clickhouse
+  template:
+    metadata:
+      labels:
+        app: ${APP_NAME}-clickhouse
+    spec:
+      imagePullSecrets:
+        - name: ocirsecret
+      containers:
+        - name: clickhouse
+          image: ${IMAGE_REPOSITORY}/clickhouse:${CLICKHOUSE_TAG}
+          ports:
+            - containerPort: 8123
+            - containerPort: 9000
+          resources:
+            requests:
+              cpu: "2"
+              memory: "8Gi"
+            limits:
+              cpu: "4"
+              memory: "16Gi"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/clickhouse
+          env:
+            - name: CLICKHOUSE_DB
+              value: "default"
+
+            - name: CLICKHOUSE_USER
+              value: "default"
+
+            - name: CLICKHOUSE_PASSWORD
+              value: "${CLICKHOUSE_PASSWORD}"
+
+            - name: CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT
+              value: "1"
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: oci-bv-high-performance
+        resources:
+          requests:
+            storage: 200Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${APP_NAME}-clickhouse
+  namespace: ${K8S_NAMESPACE}
+spec:
+  selector:
+    app: ${APP_NAME}-clickhouse
+  ports:
+    - name: http
+      port: 8123
+    - name: native
+      port: 9000
+---
+# ===== LANGFUSE APPLICATION =====
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${APP_NAME}
+  namespace: ${K8S_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${APP_NAME}
+  template:
+    metadata:
+      labels:
+        app: ${APP_NAME}
+    spec:
+      imagePullSecrets:
+        - name: ocirsecret
+
+      initContainers:
+
+        - name: wait-for-postgres
+          image: busybox
+
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z ${APP_NAME}-db 5432; do
+                echo "⏳ Waiting for PostgreSQL..."
+                sleep 2
+              done
+
+        - name: wait-for-redis
+          image: busybox
+
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z ${APP_NAME}-redis 6379; do
+                echo "⏳ Waiting for Redis..."
+                sleep 2
+              done
+
+        - name: wait-for-clickhouse
+          image: busybox
+
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z ${APP_NAME}-clickhouse 9000; do
+                echo "⏳ Waiting for ClickHouse..."
+                sleep 2
+              done
+      containers:
+        - name: ${APP_NAME}
+          image: ${IMAGE_REPOSITORY}/langfuse:${IMAGE_TAG}
+          ports:
+            - containerPort: 3000
+          env:
+            - name: DATABASE_URL
+              value: "${DATABASE_URL}"
+            - name: NEXTAUTH_SECRET
+              value: "${NEXTAUTH_SECRET}"
+            - name: SALT
+              value: "${SALT}"
+            - name: ENCRYPTION_KEY
+              value: "${ENCRYPTION_KEY}"
+            - name: NEXTAUTH_URL
+              value: ${NEXTAUTH_URL}
+            - name: TELEMETRY_ENABLED
+              value: "false"
+            - name: CLICKHOUSE_URL
+              value: "http://${APP_NAME}-clickhouse:8123"
+            - name: CLICKHOUSE_USER
+              value: "default"
+            - name: CLICKHOUSE_PASSWORD
+              value: "${CLICKHOUSE_PASSWORD}"
+            - name: CLICKHOUSE_CLUSTER_ENABLED
+              value: "false"
+            - name: CLICKHOUSE_MIGRATION_URL
+              value: "clickhouse://${APP_NAME}-clickhouse:9000"
+            - name: REDIS_HOST
+              value: "${APP_NAME}-redis"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_AUTH
+              value: "${REDIS_AUTH}"
+            # ===== OCI OBJECT STORAGE (EVENTS) =====
+            - name: LANGFUSE_USE_OCI_NATIVE_OBJECT_STORAGE
+              value: "true"
+            - name: LANGFUSE_OCI_AUTH_TYPE
+              value: "instance_principal"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
+              value: "langfuse-events"
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_REGION
+              value: "${OCI_REGION}"
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
+              value: "https://${OCI_NAMESPACE}.compat.objectstorage.${OCI_REGION}.oraclecloud.com"
+
+#            - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+#              valueFrom:
+#                secretKeyRef:
+#                  name: langfuse-secret
+#                  key: oci-access-key
+#
+#            - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+#              valueFrom:
+#                secretKeyRef:
+#                  name: langfuse-secret
+#                  key: oci-secret-key
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
+              value: "true"
+
+            # ===== EXPORT =====
+            - name: LANGFUSE_S3_BATCH_EXPORT_ENABLED
+              value: "true"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_BUCKET
+              value: "langfuse-exports"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_REGION
+              value: "${OCI_REGION}"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_ENDPOINT
+              value: "https://${OCI_NAMESPACE}.compat.objectstorage.${OCI_REGION}.oraclecloud.com"
+
+#            - name: LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID
+#              valueFrom:
+#                secretKeyRef:
+#                  name: langfuse-secret
+#                  key: oci-access-key
+#
+#            - name: LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY
+#              valueFrom:
+#                secretKeyRef:
+#                  name: langfuse-secret
+#                  key: oci-secret-key
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE
+              value: "true"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "2Gi"
+            limits:
+              cpu: "512m"
+              memory: "3Gi"
+          livenessProbe:
+            httpGet:
+              path: /api/public/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /api/public/health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+
+---
+# ===== LANGFUSE WORKER =====
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${APP_NAME}-worker
+  namespace: ${K8S_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${APP_NAME}-worker
+  template:
+    metadata:
+      labels:
+        app: ${APP_NAME}-worker
+    spec:
+      imagePullSecrets:
+        - name: ocirsecret
+
+      initContainers:
+
+        - name: wait-for-postgres
+          image: busybox
+
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z ${APP_NAME}-db 5432; do
+                echo "⏳ Waiting for PostgreSQL..."
+                sleep 2
+              done
+
+        - name: wait-for-redis
+          image: busybox
+
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z ${APP_NAME}-redis 6379; do
+                echo "⏳ Waiting for Redis..."
+                sleep 2
+              done
+
+        - name: wait-for-clickhouse
+          image: busybox
+
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z ${APP_NAME}-clickhouse 9000; do
+                echo "⏳ Waiting for ClickHouse..."
+                sleep 2
+              done
+      containers:
+        - name: worker
+          image: ${IMAGE_REPOSITORY}/langfuse-worker:${IMAGE_TAG}
+          env:
+            - name: DATABASE_URL
+              value: "${DATABASE_URL}"
+            - name: ENCRYPTION_KEY
+              value: "${ENCRYPTION_KEY}"
+            - name: CLICKHOUSE_URL
+              value: "http://${APP_NAME}-clickhouse:8123"
+            - name: CLICKHOUSE_USER
+              value: "default"
+            - name: CLICKHOUSE_PASSWORD
+              value: "${CLICKHOUSE_PASSWORD}"
+            - name: CLICKHOUSE_CLUSTER_ENABLED
+              value: "false"
+            - name: CLICKHOUSE_MIGRATION_URL
+              value: "clickhouse://${APP_NAME}-clickhouse:9000"
+            - name: REDIS_HOST
+              value: "${APP_NAME}-redis"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_AUTH
+              value: "${REDIS_AUTH}"
+            # ===== OCI OBJECT STORAGE (EVENTS) =====
+            - name: LANGFUSE_USE_OCI_NATIVE_OBJECT_STORAGE
+              value: "true"
+            - name: LANGFUSE_OCI_AUTH_TYPE
+              value: "instance_principal"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
+              value: "langfuse-events"
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_REGION
+              value: "${OCI_REGION}"
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
+              value: "https://${OCI_NAMESPACE}.compat.objectstorage.${OCI_REGION}.oraclecloud.com"
+
+#            - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+#              valueFrom:
+#                secretKeyRef:
+#                  name: langfuse-secret
+#                  key: oci-access-key
+#
+#            - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+#              valueFrom:
+#                secretKeyRef:
+#                  name: langfuse-secret
+#                  key: oci-secret-key
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
+              value: "true"
+
+            # ===== EXPORT =====
+            - name: LANGFUSE_S3_BATCH_EXPORT_ENABLED
+              value: "true"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_BUCKET
+              value: "langfuse-exports"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_REGION
+              value: "${OCI_REGION}"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_ENDPOINT
+              value: "https://${OCI_NAMESPACE}.compat.objectstorage.${OCI_REGION}.oraclecloud.com"
+
+#            - name: LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID
+#              valueFrom:
+#                secretKeyRef:
+#                  name: langfuse-secret
+#                  key: oci-access-key
+#
+#            - name: LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY
+#              valueFrom:
+#                secretKeyRef:
+#                  name: langfuse-secret
+#                  key: oci-secret-key
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE
+              value: "true"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "2Gi"
+            limits:
+              cpu: "512m"
+              memory: "3Gi"
+---
+# ===== LANGFUSE SERVICE =====
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-web
+  namespace: ${K8S_NAMESPACE}
+  annotations:
+    service.beta.kubernetes.io/oci-load-balancer-internal: "true"
+    oci.oraclecloud.com/healthcheck-path: "/api/public/health"
+    oci.oraclecloud.com/healthcheck-port: "3000"
+spec:
+  type: LoadBalancer
+  selector:
+    app: ${APP_NAME}
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+---
+# ===== LANGFUSE HPA - HORIZONTAL POD AUTOSCALER =====
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ${APP_NAME}-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ${APP_NAME}
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+# ===== WORKER - AUTOSCALER =====
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: langfuse-worker-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ${APP_NAME}-worker
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${APP_NAME}-lb
+  namespace: ${K8S_NAMESPACE}
+  annotations:
+    service.beta.kubernetes.io/oci-load-balancer-shape: "flexible"
+    oci.oraclecloud.com/healthcheck-path: "/api/public/health"
+spec:
+  type: LoadBalancer
+  selector:
+    app: ${APP_NAME}
+  ports:
+    - port: 80
+      targetPort: 3000
