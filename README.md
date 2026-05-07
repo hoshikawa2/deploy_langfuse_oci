@@ -87,13 +87,22 @@ O mesmo ocorre para:
 
 ## ☸️ Kubernetes Deployment
 
-O arquivo final.yaml contém:
+Existem 2 arquivos de deployment neste material:
+
+- langfuse_dist.yaml
+- final.yaml
+
+Ambos os arquivos contém:
 - StorageClass
 - PVCs
 - Deployments
 - StatefulSets
 - Services
 - HPA
+
+Para ambientes produtivos, use o arquivo **langfuse_dist.yaml**. As variáveis de ambiente já estão preparadas para cada componente do langfuse.
+
+Se deseja validar de forma ilustrada e passar por todos os componentes deste material, use as ferramentas mirror_images.sh, create_secrets.sh, update_secret.sh e set_var.sh para montar um arquivo YAML de deployment como tudo ajustado sem necessidade de criar um pipeline DEVOPS para isto.
 
 ## PostgreSQL
 
@@ -109,12 +118,16 @@ Readiness probe:
 pg_isready -U langfuse
 ```
 
+>**Nota:** Este deployment será mantido com o PostgreSQL. Evitamos assim utilizar outro banco de dados, como Oracle DB por não existir ainda suporte para o LangFuse.
+
 ## Redis
 
 Responsável por:
 - filas
 - cache
 - jobs
+
+>**Nota:** Repare que esta instância de Redis não está ajustado para uso com persistência. Neste caso de integração com o LangFuse, optou-se por utilizar cache somente em memória. A vantagem é performance.
 
 ## ClickHouse
 
@@ -515,7 +528,7 @@ em memória no shell.
 O arquivo:
 
 ```text
-langfuse_dest.yaml
+langfuse_dist.yaml
 ```
 
 possui placeholders:
@@ -1210,7 +1223,7 @@ Ao final:
 O script utiliza:
 
 ```bash
-envsubst < langfuse_dest.yaml > final.yaml
+envsubst < langfuse_dist.yaml > final.yaml
 ```
 
 ---
