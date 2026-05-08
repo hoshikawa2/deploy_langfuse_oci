@@ -111,6 +111,12 @@ O arquivo **langfuse_dist_cloud.yaml** permite que se utilize o PostgreSQL e Red
 
 Caso use a opção de utilizar os recursos de PostgreSQL e Redis dentro do cluster Kubernetes, existe um pacote adicional neste tutorial chamado **langfuse-k8s-cleanup.zip** onde há mecanismos para o clean-up de forma agendada dentro do próprio cluster Kubernetes.
 
+## Retenção
+
+>A recomendação geral para retenção para projetos é de 90 dias
+> 
+> A depender de volumetria, pode ser necessária uma reavaliação de projeto para determinar outras faixas para retenção.
+
 ## PostgreSQL
 
 Responsável por:
