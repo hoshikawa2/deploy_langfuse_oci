@@ -102,6 +102,7 @@ Ambos os arquivos contém:
 
 Para ambientes produtivos, use o arquivo **langfuse_dist.yaml**. As variáveis de ambiente já estão preparadas para cada componente do langfuse.
 
+>Veja o documento **Security.md** para mais detalhes de uso de segurança TLS/SSL com bancos de dados PostgreSQL e Redis.
 
 Se deseja validar de forma ilustrada e passar por todos os componentes deste material, use as ferramentas mirror_images.sh, create_secrets.sh, update_secret.sh e set_var.sh para montar um arquivo YAML de deployment como tudo ajustado sem necessidade de criar um pipeline DEVOPS para isto.
 
