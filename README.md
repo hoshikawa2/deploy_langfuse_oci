@@ -112,6 +112,11 @@ O arquivo **langfuse_dist_cloud.yaml** permite que se utilize o PostgreSQL e Red
 
 Caso use a opção de utilizar os recursos de PostgreSQL e Redis dentro do cluster Kubernetes, existe um pacote adicional neste tutorial chamado **langfuse-k8s-cleanup.zip** onde há mecanismos para o clean-up de forma agendada dentro do próprio cluster Kubernetes.
 
+Caso use a opção de implantar os recursos de PostgreSQL e Redis fora o cluster Kubernetes, estes recursos existem de forma gerenciada na Cloud Oracle. Mais detalhes em:
+
+[Banco de dados com PostgreSQL](https://www.oracle.com/br/cloud/postgresql/)
+[Oracle Cloud Cache](https://docs.oracle.com/pt-br/iaas/Content/ocicache/overview.htm)
+
 ## Retenção
 
 >A recomendação geral para retenção para projetos é de 90 dias
@@ -1721,6 +1726,8 @@ Ao final:
 - [OCI Object Storage](https://docs.oracle.com/en-us/iaas/Content/Object/Concepts/objectstorageoverview.htm)
 - [OCI S3 Compatibility API](https://docs.oracle.com/en-us/iaas/Content/Object/Tasks/s3compatibleapi.htm)
 - [Langfuse Self Hosting](https://langfuse.com/self-hosting)
+- [Banco de dados com PostgreSQL](https://www.oracle.com/br/cloud/postgresql/)
+- [Oracle Cloud Cache](https://docs.oracle.com/pt-br/iaas/Content/ocicache/overview.htm)
 
 # Acknowledgments
 
