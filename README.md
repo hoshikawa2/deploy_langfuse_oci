@@ -89,8 +89,8 @@ O mesmo ocorre para:
 
 Existem 2 arquivos de deployment neste material:
 
-- langfuse_dist.yaml
-- final.yaml
+- **langfuse_dist.yaml** (ou **langfuse_dist_cloud.yaml** para utilização de storage externo ao clustes Kubernetes)
+- **final.yaml**
 
 Ambos os arquivos contém:
 - StorageClass
@@ -102,7 +102,14 @@ Ambos os arquivos contém:
 
 Para ambientes produtivos, use o arquivo **langfuse_dist.yaml**. As variáveis de ambiente já estão preparadas para cada componente do langfuse.
 
+
 Se deseja validar de forma ilustrada e passar por todos os componentes deste material, use as ferramentas mirror_images.sh, create_secrets.sh, update_secret.sh e set_var.sh para montar um arquivo YAML de deployment como tudo ajustado sem necessidade de criar um pipeline DEVOPS para isto.
+
+## Persistência fora do Cluster Kubernetes
+
+O arquivo **langfuse_dist_cloud.yaml** permite que se utilize o PostgreSQL e Redis fora do cluster Kubernetes. Isto permite que se faça a governança destes recursos de forma mais tradicional, além de maior economia na escalabilidade e melhoras em troubleshooting em geral.
+
+Caso use a opção de utilizar os recursos de PostgreSQL e Redis dentro do cluster Kubernetes, existe um pacote adicional neste tutorial chamado **langfuse-k8s-cleanup.zip** onde há mecanismos para o clean-up de forma agendada dentro do próprio cluster Kubernetes.
 
 ## PostgreSQL
 
@@ -1102,70 +1109,369 @@ Define se ClickHouse opera em cluster distribuído.
 
 ---
 
-## LANGFUSE_S3_EVENT_UPLOAD_BUCKET
+# Configuração OCI Object Storage para Upload de Eventos no Langfuse
 
-```bash id="vars44"
-export LANGFUSE_S3_EVENT_UPLOAD_BUCKET="langfuse-events"
-```
+## Objetivo
 
-### Objetivo
+Estas variáveis configuram o Langfuse para armazenar eventos, traces e arquivos no OCI Object Storage utilizando a API compatível com Amazon S3.
 
-Bucket de eventos.
+O Langfuse utiliza esse storage para:
+
+- Persistência de eventos
+- Upload de traces grandes
+- Armazenamento de payloads
+- Redução de carga no PostgreSQL
+- Redução de crescimento do ClickHouse
+- Armazenamento distribuído e durável
 
 ---
+
+# Variáveis de Ambiente
+
+## LANGFUSE_S3_EVENT_UPLOAD_BUCKET
+
+```yaml
+- name: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
+  value: "langfuse-events"
+```
+
+Objetivo
+
+Define o bucket do OCI Object Storage onde os eventos serão armazenados.
+
+Observações
+
+-O bucket deve existir previamente.
+-O bucket precisa estar na mesma região configurada.
+-Pode ser Standard ou Archive (recomendado Standard).  
+
+    oci os bucket create \
+    --name langfuse-events \
+    --compartment-id <COMPARTMENT_OCID>
+
+## LANGFUSE_S3_EVENT_UPLOAD_PREFIX
+
+```yaml
+- name: LANGFUSE_S3_EVENT_UPLOAD_PREFIX
+  value: "events/"
+```
+
+Objetivo
+
+Define o prefixo (pasta lógica) dentro do bucket.
+
+Resultado
+
+Os objetos serão gravados em:
+    
+    langfuse-events/events/
+
+Exemplo de objeto
+
+    events/traces/abc123.json
+
+Benefícios
+
+Permite:
+
+- Separar ambientes
+- Organizar dados
+- Facilitar lifecycle policies
+- Facilitar limpeza automática
+
+Exemplos úteis
+
+Produção:
+
+    value: "prod/events/"
+
+Homologação:
+
+    value: "hml/events/"
+
+Multi-Tenant:
+
+    value: "tenant-a/events/"
 
 ## LANGFUSE_S3_EVENT_UPLOAD_REGION
 
-```bash id="vars45"
-export LANGFUSE_S3_EVENT_UPLOAD_REGION="${OCI_REGION}"
-```
+    - name: LANGFUSE_S3_EVENT_UPLOAD_REGION
+      value: "${OCI_REGION}"
 
-### Objetivo
+Objetivo
 
-Região do bucket.
+Define a região OCI do Object Storage.
 
----
+Exemplos
+    
+    sa-saopaulo-1
+    us-chicago-1
+    eu-frankfurt-1
+
+Importância
+
+A região precisa coincidir com:
+
+* bucket criado
+* endpoint S3
+* credenciais utilizadas
+
+Exemplo
+
+    value: "sa-saopaulo-1"
 
 ## LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
+    
+    - name: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
+      value: "https://${OCI_NAMESPACE}.compat.objectstorage.${OCI_REGION}.oraclecloud.com"
 
-```bash id="vars46"
-export LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT="https://${OCI_NAMESPACE}.compat.objectstorage.${OCI_REGION}.oraclecloud.com"
-```
+Objetivo
 
-### Objetivo
+Define o endpoint S3 compatível da OCI.
 
-Endpoint S3-compatible OCI.
+O OCI Object Storage possui uma API compatível com Amazon S3.
 
----
+O Langfuse usa esse endpoint como se fosse AWS S3.
 
-## LANGFUSE_USE_OCI_NATIVE_OBJECT_STORAGE
+⸻
 
-```bash id="vars47"
-export LANGFUSE_USE_OCI_NATIVE_OBJECT_STORAGE="true"
-```
+Estrutura do endpoint
 
-### Objetivo
+    https://<NAMESPACE>.compat.objectstorage.<REGION>.oraclecloud.com
 
-Ativa integração OCI nativa.
+Exemplo real
 
----
+    https://mycompany.compat.objectstorage.sa-saopaulo-1.oraclecloud.com
 
-## LANGFUSE_OCI_AUTH_TYPE
 
-```bash id="vars48"
-export LANGFUSE_OCI_AUTH_TYPE="instance_principal"
-```
+O que é OCI_NAMESPACE
 
-### Objetivo
+O namespace é um identificador único global do tenancy OCI.
 
-Utiliza Instance Principal em vez de Access Key.
+Exemplo
 
-### Benefício
+    xkthfgahad
 
-Não precisamos:
+Como descobrir o namespace
 
-* access key
-* secret key
+OCI CLI
+
+    oci os ns get
+
+Console OCI
+
+Object Storage → Namespace
+
+⸻
+
+## LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+    
+    - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+      value: "${S3_ACCESS_KEY}"
+
+Objetivo
+
+Define o Access Key utilizado para autenticação S3.
+
+Funciona similar ao AWS Access Key ID.
+
+>**Nota:** O par de keys de Custom Keys não pode ser gerado automaticamente pois não é fornecido o Secret. Isso só é possível via Console OCi
+
+    Identity & Security
+    
+    → Users
+    
+    → Seu usuário
+    
+    → Customer Secret Keys
+    
+    → Generate Secret Key
+
+## LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+    
+    - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+      value: "${S3_SECRET_KEY}"
+
+Objetivo
+
+Define o segredo associado ao Access Key.
+
+É equivalente ao AWS Secret Access Key.
+
+⸻
+
+Observações importantes
+
+* A secret é exibida apenas UMA vez na criação.
+* Deve ser armazenada com segurança.
+* Idealmente usar OCI Vault.
+
+⸻
+
+Recomendação
+
+Nunca colocar diretamente no YAML.
+
+Preferir:
+    
+    valueFrom:
+      secretKeyRef:
+        name: object-storage-secret
+        key: S3_SECRET_KEY
+
+## LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
+
+    - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
+      value: "true"
+
+Objetivo
+
+Força o cliente S3 a usar Path Style ao invés de Virtual Host Style.
+
+⸻
+
+Diferença entre estilos
+
+Virtual Host Style (AWS padrão)
+    
+    https://bucket.endpoint/object
+
+Exemplo:
+
+    https://langfuse-events.s3.amazonaws.com/file.json
+
+Path Style
+
+    https://endpoint/bucket/object
+
+Exemplo:
+
+    https://compat.objectstorage.sa-saopaulo-1.oraclecloud.com/langfuse-events/file.json
+
+
+Por que OCI precisa disso
+
+O endpoint compatível S3 da OCI funciona melhor com:
+
+    LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE=true
+
+
+Sem isso podem ocorrer:
+
+- erro de assinatura
+- erro de hostname
+- erro 403
+- bucket não encontrado
+
+### Fluxo de Funcionamento
+
+    Langfuse
+    ↓
+    S3 Compatible Client
+    ↓
+    OCI Object Storage Endpoint
+    ↓
+    Bucket OCI
+    ↓
+    Persistência de Eventos
+
+Benefícios dessa Arquitetura
+
+Redução de Crescimento do PostgreSQL
+
+Payloads grandes não ficam somente no banco.
+
+⸻
+
+Melhor Escalabilidade
+
+Object Storage escala automaticamente.
+
+⸻
+
+Alta Durabilidade
+
+OCI Object Storage possui alta redundância.
+
+⸻
+
+Menor Custo
+
+Storage é mais barato que expandir PostgreSQL.
+
+⸻
+
+Facilidade de Backup
+
+Object Storage já possui durabilidade nativa.
+
+⸻
+
+Recomendações Enterprise
+
+Usar OCI Vault
+
+Evitar secrets hardcoded.
+
+⸻
+
+Usar Instance Principal
+
+Evitar Access Key fixa.
+
+⸻
+
+Criar Lifecycle Policies
+
+Exemplo:
+    
+    Apagar eventos após 30 dias
+    Mover para Archive após 7 dias
+
+### Exemplo de Lifecycle Policy
+
+    Object Storage
+    → Bucket
+    → Lifecycle Policy
+
+### Segurança Recomendada
+
+Bucket privado
+
+Nunca público.
+
+⸻
+
+Network privada
+
+Preferencialmente:
+
+* OKE privado
+* Object Storage via Service Gateway
+
+⸻
+
+Policies mínimas
+
+Exemplo:
+
+    Allow dynamic-group oke-cluster to manage objects in compartment observability
+
+
+
+⸻
+
+Importante
+
+No OCI, esse Access Key pertence a um usuário OCI.
+
+Não é o OCID do usuário.
+
+⸻
+
+Como gerar
+
+OCI Console
 
 ---
 
@@ -1405,6 +1711,9 @@ Ao final:
 # Referências
 
 - [Langfuse - OCI Object Storage (Native)](https://langfuse.com/self-hosting/deployment/infrastructure/blobstorage#oci-object-storage)
+- [OCI Object Storage](https://docs.oracle.com/en-us/iaas/Content/Object/Concepts/objectstorageoverview.htm)
+- [OCI S3 Compatibility API](https://docs.oracle.com/en-us/iaas/Content/Object/Tasks/s3compatibleapi.htm)
+- [Langfuse Self Hosting](https://langfuse.com/self-hosting)
 
 # Acknowledgments
 
