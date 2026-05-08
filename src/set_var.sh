@@ -72,15 +72,16 @@ export APP_NAME="langfuse"
 export K8S_NAMESPACE="langfuse"
 
 export IMAGE_REPOSITORY="${REGISTRY}"
-export IMAGE_TAG="3.1.0"
+export LANGFUSE_TAG="3.167.4"
+export LANGFUSE_WORKER_TAG="3.167"
 
-export CLICKHOUSE_TAG="23.8"
+export CLICKHOUSE_TAG="24.3"
 export REDIS_TAG="7.2"
 export POSTGRES_TAG="15"
 
 echo "✔️ App: $APP_NAME"
 echo "✔️ Namespace: $K8S_NAMESPACE"
-echo "✔️ Image: $IMAGE_REPOSITORY:$IMAGE_TAG"
+echo "✔️ Image: $IMAGE_REPOSITORY:$LANGFUSE_TAG"
 
 # =========================
 
@@ -91,7 +92,7 @@ echo "✔️ Image: $IMAGE_REPOSITORY:$IMAGE_TAG"
 echo ""
 echo "🌐 Etapa 5: URL..."
 
-export NEXTAUTH_URL="https://langfuse.seudominio.com"
+export NEXTAUTH_URL="http://localhost:8087"
 
 echo "✔️ URL: $NEXTAUTH_URL"
 
@@ -135,6 +136,9 @@ echo "✔️ NEXTAUTH_SECRET carregado"
 
 
 export ENCRYPTION_KEY=$(get_secret "$OCI_SECRET_ENCRYPTION" | tr -d '\r\n')
+
+export S3_ACCESS_KEY=$(get_secret "$OCI_SECRET_OCI_ACCESS")
+export S3_SECRET_KEY=$(get_secret "$OCI_SECRET_OCI_SECRET")
 
 # Corrige automaticamente caso a key esteja inválida
 if ! [[ "$ENCRYPTION_KEY" =~ ^[a-fA-F0-9]{64}$ ]]; then
@@ -193,7 +197,7 @@ echo "☁️ Etapa 9: Config OCI Object Storage..."
 export LANGFUSE_S3_EVENT_UPLOAD_BUCKET="langfuse-events"
 export LANGFUSE_S3_EVENT_UPLOAD_REGION="${OCI_REGION}"
 export LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT="https://${OCI_NAMESPACE}.compat.objectstorage.${OCI_REGION}.oraclecloud.com"
-export LANGFUSE_USE_OCI_NATIVE_OBJECT_STORAGE="true"
+#export LANGFUSE_USE_OCI_NATIVE_OBJECT_STORAGE="true"
 echo "✔️ Bucket eventos: $LANGFUSE_S3_EVENT_UPLOAD_BUCKET"
 
 # =========================

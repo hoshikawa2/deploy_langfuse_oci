@@ -17,6 +17,11 @@ export OCI_SECRET_NEXTAUTH="ocid1.vaultsecret.oc1.iad.xxxxxxxxxxxxxxxxxxxxxxxxxx
 export OCI_SECRET_CLICKHOUSE="ocid1.vaultsecret.oc1.iad.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 export OCI_SECRET_REDIS="ocid1.vaultsecret.oc1.iad.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 export OCI_SECRET_DB="ocid1.vaultsecret.oc1.iad.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+export USER_OCID="ocid1.user.oc1..xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# O par de keys de Custom Keys não pode ser gerado automaticamente pois não é fornecido o Secret. Isso só é possível via Console OCi
+export OCI_ACCESS_KEY="88328a8bd76fe91d9891ef5a95169c981c56dd16"
+export OCI_SECRET_KEY="/kzBzm14HLP9WybwHtAXmNyyJB6WUU74bI2cVeNYhaQ="
 
 # =========================
 # 🔑 VALORES
@@ -79,3 +84,7 @@ echo "✅ Secrets atualizados com sucesso!"
 echo ""
 echo "👉 ENCRYPTION_KEY usada:"
 echo "$ENCRYPTION_KEY"
+
+update_secret "$OCI_SECRET_OCI_ACCESS" "$OCI_ACCESS_KEY"
+
+update_secret "$OCI_SECRET_OCI_SECRET" "$OCI_SECRET_KEY"

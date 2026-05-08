@@ -7,13 +7,19 @@ echo "🔐 Criando secrets no OCI Vault..."
 # ⚙️ CONFIG
 # =========================
 
-export COMPARTMENT_ID="ocid1.compartment.oc1..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+export COMPARTMENT_ID="ocid1.compartment.oc1..xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
-export VAULT_ID="ocid1.vault.oc1.iad.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+export VAULT_ID="ocid1.vault.oc1.iad.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
-export KEY_ID="ocid1.key.oc1.iad.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+export KEY_ID="ocid1.key.oc1.iad.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+export USER_OCID="ocid1.user.oc1..xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 export PREFIX="langfuse"
+
+# O par de keys de Custom Keys não pode ser gerado automaticamente pois não é fornecido o Secret. Isso só é possível via Console OCi
+export S3_ACCESS_KEY="88328a8bd76fe91d9891ef5a95169c981c56dd16"
+export S3_SECRET_KEY="/kzBzm14HLP9WybwHtAXmNyyJB6WUU74bI2cVeNYhaQ="
 
 # =========================
 # 🔑 SENHAS
@@ -78,9 +84,13 @@ ENCRYPTION_SECRET=$(create_secret "${PREFIX}-encryption" "$ENCRYPTION_KEY")
 
 SALT_SECRET=$(create_secret "${PREFIX}-salt" "$COMMON_SECRET")
 
-OCI_ACCESS_SECRET=$(create_secret "${PREFIX}-oci-access" "$COMMON_SECRET")
+OCI_ACCESS_SECRET=$(create_secret \
+  "${PREFIX}-oci-access" \
+  "$S3_ACCESS_KEY")
 
-OCI_SECRET_SECRET=$(create_secret "${PREFIX}-oci-secret" "$COMMON_SECRET")
+OCI_SECRET_SECRET=$(create_secret \
+  "${PREFIX}-oci-secret" \
+  "$S3_SECRET_KEY")
 
 # =========================
 # 📤 OUTPUT
@@ -98,6 +108,5 @@ echo "export OCI_SECRET_ENCRYPTION=$ENCRYPTION_SECRET"
 echo "export OCI_SECRET_SALT=$SALT_SECRET"
 echo "export OCI_SECRET_OCI_ACCESS=$OCI_ACCESS_SECRET"
 echo "export OCI_SECRET_OCI_SECRET=$OCI_SECRET_SECRET"
-
 echo ""
 echo "💡 Salve isso no seu pipeline ou env.sh"

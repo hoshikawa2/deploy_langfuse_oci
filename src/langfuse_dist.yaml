@@ -259,7 +259,7 @@ spec:
               done
       containers:
         - name: ${APP_NAME}
-          image: ${IMAGE_REPOSITORY}/langfuse:${IMAGE_TAG}
+          image: ${IMAGE_REPOSITORY}/langfuse:${LANGFUSE_TAG}
           ports:
             - containerPort: 3000
           env:
@@ -292,12 +292,11 @@ spec:
             - name: REDIS_AUTH
               value: "${REDIS_AUTH}"
             # ===== OCI OBJECT STORAGE (EVENTS) =====
-            - name: LANGFUSE_USE_OCI_NATIVE_OBJECT_STORAGE
-              value: "true"
-            - name: LANGFUSE_OCI_AUTH_TYPE
-              value: "instance_principal"
             - name: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
               value: "langfuse-events"
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_PREFIX
+              value: "events/"
 
             - name: LANGFUSE_S3_EVENT_UPLOAD_REGION
               value: "${OCI_REGION}"
@@ -305,47 +304,13 @@ spec:
             - name: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
               value: "https://${OCI_NAMESPACE}.compat.objectstorage.${OCI_REGION}.oraclecloud.com"
 
-#            - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
-#              valueFrom:
-#                secretKeyRef:
-#                  name: langfuse-secret
-#                  key: oci-access-key
-#
-#            - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
-#              valueFrom:
-#                secretKeyRef:
-#                  name: langfuse-secret
-#                  key: oci-secret-key
+            - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+              value: "${S3_ACCESS_KEY}"
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+              value: "${S3_SECRET_KEY}"
 
             - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
-              value: "true"
-
-            # ===== EXPORT =====
-            - name: LANGFUSE_S3_BATCH_EXPORT_ENABLED
-              value: "true"
-
-            - name: LANGFUSE_S3_BATCH_EXPORT_BUCKET
-              value: "langfuse-exports"
-
-            - name: LANGFUSE_S3_BATCH_EXPORT_REGION
-              value: "${OCI_REGION}"
-
-            - name: LANGFUSE_S3_BATCH_EXPORT_ENDPOINT
-              value: "https://${OCI_NAMESPACE}.compat.objectstorage.${OCI_REGION}.oraclecloud.com"
-
-#            - name: LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID
-#              valueFrom:
-#                secretKeyRef:
-#                  name: langfuse-secret
-#                  key: oci-access-key
-#
-#            - name: LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY
-#              valueFrom:
-#                secretKeyRef:
-#                  name: langfuse-secret
-#                  key: oci-secret-key
-
-            - name: LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE
               value: "true"
           resources:
             requests:
@@ -427,7 +392,7 @@ spec:
               done
       containers:
         - name: worker
-          image: ${IMAGE_REPOSITORY}/langfuse-worker:${IMAGE_TAG}
+          image: ${IMAGE_REPOSITORY}/langfuse-worker:${LANGFUSE_WORKER_TAG}
           env:
             - name: DATABASE_URL
               value: "${DATABASE_URL}"
@@ -450,12 +415,11 @@ spec:
             - name: REDIS_AUTH
               value: "${REDIS_AUTH}"
             # ===== OCI OBJECT STORAGE (EVENTS) =====
-            - name: LANGFUSE_USE_OCI_NATIVE_OBJECT_STORAGE
-              value: "true"
-            - name: LANGFUSE_OCI_AUTH_TYPE
-              value: "instance_principal"
             - name: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
               value: "langfuse-events"
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_PREFIX
+              value: "events/"
 
             - name: LANGFUSE_S3_EVENT_UPLOAD_REGION
               value: "${OCI_REGION}"
@@ -463,47 +427,13 @@ spec:
             - name: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
               value: "https://${OCI_NAMESPACE}.compat.objectstorage.${OCI_REGION}.oraclecloud.com"
 
-#            - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
-#              valueFrom:
-#                secretKeyRef:
-#                  name: langfuse-secret
-#                  key: oci-access-key
-#
-#            - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
-#              valueFrom:
-#                secretKeyRef:
-#                  name: langfuse-secret
-#                  key: oci-secret-key
+            - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+              value: "${S3_ACCESS_KEY}"
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+              value: "${S3_SECRET_KEY}"
 
             - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
-              value: "true"
-
-            # ===== EXPORT =====
-            - name: LANGFUSE_S3_BATCH_EXPORT_ENABLED
-              value: "true"
-
-            - name: LANGFUSE_S3_BATCH_EXPORT_BUCKET
-              value: "langfuse-exports"
-
-            - name: LANGFUSE_S3_BATCH_EXPORT_REGION
-              value: "${OCI_REGION}"
-
-            - name: LANGFUSE_S3_BATCH_EXPORT_ENDPOINT
-              value: "https://${OCI_NAMESPACE}.compat.objectstorage.${OCI_REGION}.oraclecloud.com"
-
-#            - name: LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID
-#              valueFrom:
-#                secretKeyRef:
-#                  name: langfuse-secret
-#                  key: oci-access-key
-#
-#            - name: LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY
-#              valueFrom:
-#                secretKeyRef:
-#                  name: langfuse-secret
-#                  key: oci-secret-key
-
-            - name: LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE
               value: "true"
           resources:
             requests:

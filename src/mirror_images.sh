@@ -8,13 +8,14 @@ set -e
 # =========================
 
 export REGION="iad"
-export TENANCY_NAMESPACE="aaaaaaaaa"
+export TENANCY_NAMESPACE="idavixsf5sbx"
 export REGISTRY="${REGION}.ocir.io/${TENANCY_NAMESPACE}"
 
 # Tags fixas (produção)
 
-export LANGFUSE_TAG="3.1.0"
-export CLICKHOUSE_TAG="23.8"
+export LANGFUSE_TAG="3.167.4"
+export LANGFUSE_WORKER_TAG="3.167"
+export CLICKHOUSE_TAG="24.3"
 export REDIS_TAG="7.2"
 export POSTGRES_TAG="15"
 
@@ -38,12 +39,12 @@ docker push ${REGISTRY}/langfuse:${LANGFUSE_TAG}
 
 echo "📦 Langfuse Worker..."
 
-docker pull langfuse/langfuse-worker:${LANGFUSE_TAG}
+docker pull langfuse/langfuse-worker:${LANGFUSE_WORKER_TAG}
 
-docker tag langfuse/langfuse-worker:${LANGFUSE_TAG} \
-           ${REGISTRY}/langfuse-worker:${LANGFUSE_TAG}
+docker tag langfuse/langfuse-worker:${LANGFUSE_WORKER_TAG} \
+           ${REGISTRY}/langfuse-worker:${LANGFUSE_WORKER_TAG}
 
-docker push ${REGISTRY}/langfuse-worker:${LANGFUSE_TAG}
+docker push ${REGISTRY}/langfuse-worker:${LANGFUSE_WORKER_TAG}
 
 # =========================
 

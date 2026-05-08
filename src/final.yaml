@@ -43,7 +43,7 @@ spec:
         - name: ocirsecret
       containers:
         - name: langfuse-db
-          image: iad.ocir.io/xxxxxxxxxx/postgres:15
+          image: iad.ocir.io/xxxxxxxxxxx/postgres:15
           ports:
             - containerPort: 5432
           env:
@@ -150,7 +150,7 @@ spec:
         - name: ocirsecret
       containers:
         - name: clickhouse
-          image: iad.ocir.io/xxxxxxxxxxxx/clickhouse:23.8
+          image: iad.ocir.io/xxxxxxxxxxx/clickhouse:24.3
           ports:
             - containerPort: 8123
             - containerPort: 9000
@@ -259,7 +259,7 @@ spec:
               done
       containers:
         - name: langfuse
-          image: iad.ocir.io/xxxxxxxxxxxx/langfuse:3.1.0
+          image: iad.ocir.io/xxxxxxxxxxx/langfuse:3.167.4
           ports:
             - containerPort: 3000
           env:
@@ -270,9 +270,9 @@ spec:
             - name: SALT
               value: "salt-secret-123"
             - name: ENCRYPTION_KEY
-              value: "ea58fe36914e38ec5d52657c928d3e8350ff1513e1930e0fd306dce6422bf87d"
+              value: "eec258dc97a3baea5a05de906ebe3a92b57f1cccc191ea2ad15fab3890609dda"
             - name: NEXTAUTH_URL
-              value: https://langfuse.seudominio.com
+              value: http://localhost:8087
             - name: TELEMETRY_ENABLED
               value: "false"
             - name: CLICKHOUSE_URL
@@ -292,60 +292,25 @@ spec:
             - name: REDIS_AUTH
               value: "redis123"
             # ===== OCI OBJECT STORAGE (EVENTS) =====
-            - name: LANGFUSE_USE_OCI_NATIVE_OBJECT_STORAGE
-              value: "true"
-            - name: LANGFUSE_OCI_AUTH_TYPE
-              value: "instance_principal"
             - name: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
               value: "langfuse-events"
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_PREFIX
+              value: "events/"
 
             - name: LANGFUSE_S3_EVENT_UPLOAD_REGION
               value: "us-ashburn-1"
 
             - name: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
-              value: "https://xxxxxxxxxxx.compat.objectstorage.us-ashburn-1.oraclecloud.com"
+              value: "https://xxxxxxxxxxxxxx.compat.objectstorage.us-ashburn-1.oraclecloud.com"
 
-#            - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
-#              valueFrom:
-#                secretKeyRef:
-#                  name: langfuse-secret
-#                  key: oci-access-key
-#
-#            - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
-#              valueFrom:
-#                secretKeyRef:
-#                  name: langfuse-secret
-#                  key: oci-secret-key
+            - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+              value: "88328a8bd76fe91d9891ef5a95169c981c56dd16"
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+              value: "/kzBzm14HLP9WybwHtAXmNyyJB6WUU74bI2cVeNYhaQ="
 
             - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
-              value: "true"
-
-            # ===== EXPORT =====
-            - name: LANGFUSE_S3_BATCH_EXPORT_ENABLED
-              value: "true"
-
-            - name: LANGFUSE_S3_BATCH_EXPORT_BUCKET
-              value: "langfuse-exports"
-
-            - name: LANGFUSE_S3_BATCH_EXPORT_REGION
-              value: "us-ashburn-1"
-
-            - name: LANGFUSE_S3_BATCH_EXPORT_ENDPOINT
-              value: "https://xxxxxxxxxxxx.compat.objectstorage.us-ashburn-1.oraclecloud.com"
-
-#            - name: LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID
-#              valueFrom:
-#                secretKeyRef:
-#                  name: langfuse-secret
-#                  key: oci-access-key
-#
-#            - name: LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY
-#              valueFrom:
-#                secretKeyRef:
-#                  name: langfuse-secret
-#                  key: oci-secret-key
-
-            - name: LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE
               value: "true"
           resources:
             requests:
@@ -427,12 +392,12 @@ spec:
               done
       containers:
         - name: worker
-          image: iad.ocir.io/xxxxxxxxxxxx/langfuse-worker:3.1.0
+          image: iad.ocir.io/xxxxxxxxxxx/langfuse-worker:3.167
           env:
             - name: DATABASE_URL
               value: "postgresql://langfuse:langfuse123@langfuse-db:5432/langfuse"
             - name: ENCRYPTION_KEY
-              value: "ea58fe36914e38ec5d52657c928d3e8350ff1513e1930e0fd306dce6422bf87d"
+              value: "eec258dc97a3baea5a05de906ebe3a92b57f1cccc191ea2ad15fab3890609dda"
             - name: CLICKHOUSE_URL
               value: "http://langfuse-clickhouse:8123"
             - name: CLICKHOUSE_USER
@@ -450,60 +415,25 @@ spec:
             - name: REDIS_AUTH
               value: "redis123"
             # ===== OCI OBJECT STORAGE (EVENTS) =====
-            - name: LANGFUSE_USE_OCI_NATIVE_OBJECT_STORAGE
-              value: "true"
-            - name: LANGFUSE_OCI_AUTH_TYPE
-              value: "instance_principal"
             - name: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
               value: "langfuse-events"
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_PREFIX
+              value: "events/"
 
             - name: LANGFUSE_S3_EVENT_UPLOAD_REGION
               value: "us-ashburn-1"
 
             - name: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
-              value: "https://xxxxxxxxx.compat.objectstorage.us-ashburn-1.oraclecloud.com"
+              value: "https://xxxxxxxxxxxxxx.compat.objectstorage.us-ashburn-1.oraclecloud.com"
 
-#            - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
-#              valueFrom:
-#                secretKeyRef:
-#                  name: langfuse-secret
-#                  key: oci-access-key
-#
-#            - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
-#              valueFrom:
-#                secretKeyRef:
-#                  name: langfuse-secret
-#                  key: oci-secret-key
+            - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+              value: "88328a8bd76fe91d9891ef5a95169c981c56dd16"
+
+            - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+              value: "/kzBzm14HLP9WybwHtAXmNyyJB6WUU74bI2cVeNYhaQ="
 
             - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
-              value: "true"
-
-            # ===== EXPORT =====
-            - name: LANGFUSE_S3_BATCH_EXPORT_ENABLED
-              value: "true"
-
-            - name: LANGFUSE_S3_BATCH_EXPORT_BUCKET
-              value: "langfuse-exports"
-
-            - name: LANGFUSE_S3_BATCH_EXPORT_REGION
-              value: "us-ashburn-1"
-
-            - name: LANGFUSE_S3_BATCH_EXPORT_ENDPOINT
-              value: "https://xxxxxxxxxxx.compat.objectstorage.us-ashburn-1.oraclecloud.com"
-
-#            - name: LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID
-#              valueFrom:
-#                secretKeyRef:
-#                  name: langfuse-secret
-#                  key: oci-access-key
-#
-#            - name: LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY
-#              valueFrom:
-#                secretKeyRef:
-#                  name: langfuse-secret
-#                  key: oci-secret-key
-
-            - name: LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE
               value: "true"
           resources:
             requests:
