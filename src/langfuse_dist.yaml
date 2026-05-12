@@ -312,6 +312,35 @@ spec:
 
             - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
               value: "true"
+
+            # ===== OCI OBJECT STORAGE (EXPORT) =====
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_ENABLED
+
+              value: "true"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_BUCKET
+
+              value: "langfuse-export"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_PREFIX
+
+              value: "exports/"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_REGION
+              value: "${OCI_REGION}"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_ENDPOINT
+              value: "https://${OCI_NAMESPACE}.compat.objectstorage.${OCI_REGION}.oraclecloud.com"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID
+              value: "${S3_ACCESS_KEY}"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY
+              value: "${S3_SECRET_KEY}"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE
+              value: "true"
           resources:
             requests:
               cpu: "50m"
@@ -434,6 +463,35 @@ spec:
               value: "${S3_SECRET_KEY}"
 
             - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
+              value: "true"
+
+            # ===== OCI OBJECT STORAGE (EXPORT) =====
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_ENABLED
+
+              value: "true"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_BUCKET
+
+              value: "langfuse-export"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_PREFIX
+
+              value: "exports/"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_REGION
+              value: "${OCI_REGION}"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_ENDPOINT
+              value: "https://${OCI_NAMESPACE}.compat.objectstorage.${OCI_REGION}.oraclecloud.com"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID
+              value: "${S3_ACCESS_KEY}"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY
+              value: "${S3_SECRET_KEY}"
+
+            - name: LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE
               value: "true"
           resources:
             requests:
